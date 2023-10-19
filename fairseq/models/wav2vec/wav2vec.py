@@ -297,7 +297,8 @@ class Wav2VecModel(BaseFairseqModel):
 
     def forward(self, source):
         result = {}
-
+        
+        # logger.info(source.shape)
         features = self.feature_extractor(source)
         if self.vector_quantizer:
             q_res = self.vector_quantizer(features)
@@ -387,7 +388,7 @@ class ConvFeatureExtractionModel(nn.Module):
                 activation,
             )
 
-        in_d = 1
+        in_d = 256 # match electrode channels
         self.conv_layers = nn.ModuleList()
         for dim, k, stride in conv_layers:
             self.conv_layers.append(block(in_d, dim, k, stride))
@@ -399,10 +400,12 @@ class ConvFeatureExtractionModel(nn.Module):
 
     def forward(self, x):
         # BxT -> BxCxT
-        x = x.unsqueeze(1)
+        # x = x.unsqueeze(1) 
 
         for conv in self.conv_layers:
             residual = x
+            # logger.info(x.shape)
+            
             x = conv(x)
             if self.skip_connections and x.size(1) == residual.size(1):
                 tsz = x.size(2)

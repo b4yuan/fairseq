@@ -82,13 +82,18 @@ class RawAudioDataset(FairseqDataset):
         return len(self.sizes)
 
     def postprocess(self, feats, curr_sample_rate):
-        if feats.dim() == 2:
-            feats = feats.mean(-1)
-
+        
+        '''
+        The following if block has been removed to prevent multi-channel inputs
+        from getting converted to single-channel inputs
+        '''
+        # if feats.dim() == 2:
+        #     feats = feats.mean(-1)
+        
         if curr_sample_rate != self.sample_rate:
             raise Exception(f"sample rate: {curr_sample_rate}, need {self.sample_rate}")
 
-        assert feats.dim() == 1, feats.dim()
+        assert feats.dim() == 2, feats.dim() # changed to 2 from 1
 
         if self.normalize:
             with torch.no_grad():
@@ -120,15 +125,18 @@ class RawAudioDataset(FairseqDataset):
         if len(samples) == 0:
             return {}
 
-        sources = [s["source"] for s in samples]
-        sizes = [len(s) for s in sources]
+        sources = [s["source"].T for s in samples]
+        sizes = [len(s.T) for s in sources]
 
         if self.pad:
             target_size = min(max(sizes), self.max_sample_size)
         else:
             target_size = min(min(sizes), self.max_sample_size)
+            
+        # logger.info(target_size)
 
-        collated_sources = sources[0].new_zeros(len(sources), target_size)
+        collated_sources = sources[0].new_zeros(len(sources), 256, target_size) # add the 256 arg for # of electrode channels
+        # logger.info('Collated sources shape: ' + str(collated_sources.shape))
         padding_mask = (
             torch.BoolTensor(collated_sources.shape).fill_(False) if self.pad else None
         )
@@ -258,7 +266,7 @@ class FileAudioDataset(RawAudioDataset):
             compute_mask=compute_mask,
             **mask_compute_kwargs,
         )
-
+        
         self.text_compressor = TextCompressor(level=text_compression_level)
 
         skipped = 0
@@ -311,7 +319,7 @@ class FileAudioDataset(RawAudioDataset):
         wav = None
         for i in range(retry):
             try:
-                wav, curr_sample_rate = sf.read(path_or_fp, dtype="float32")
+                wav, curr_sample_rate = sf.read(path_or_fp, dtype="float32") # wavs get loaded in with correct shape here (x, 256)
                 break
             except Exception as e:
                 logger.warning(
@@ -323,8 +331,9 @@ class FileAudioDataset(RawAudioDataset):
             raise Exception(f"Failed to load {path_or_fp}")
 
         feats = torch.from_numpy(wav).float()
-        feats = self.postprocess(feats, curr_sample_rate)
-
+        # logging.info(feats.shape)
+        feats = self.postprocess(feats, curr_sample_rate) # postprocess turns wavs into single channel
+        # logging.info(feats.shape)
         v = {"id": index, "source": feats}
 
         if self.is_compute_mask:

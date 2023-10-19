@@ -325,6 +325,7 @@ class EpochBatchIterator(EpochBatchIterating):
     ):
         assert isinstance(dataset, torch.utils.data.Dataset)
         self.dataset = dataset
+        logger.info('First train data shape: ' + str(self.dataset[0]['source'].shape))
         self.collate_fn = collate_fn
         self.batch_sampler = batch_sampler
         self._frozen_batches = (

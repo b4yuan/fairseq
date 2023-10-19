@@ -71,7 +71,7 @@ def main(cfg: FairseqConfig) -> None:
         checkpoint_utils.verify_checkpoint_directory(cfg.checkpoint.save_dir)
 
     # Print args
-    logger.info(cfg)
+    logger.info('Args: ', cfg)
 
     if cfg.checkpoint.write_checkpoints_asynchronously:
         try:

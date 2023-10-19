@@ -525,6 +525,7 @@ class FairseqTask(object):
                   gradient
                 - logging outputs to display while training
         """
+        # logger.info(sample['net_input']['source'].shape)
         model.train()
         model.set_num_updates(update_num)
         with torch.autograd.profiler.record_function("forward"):
