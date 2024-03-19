@@ -29,6 +29,9 @@ from fairseq.models.ema import build_ema
 from fairseq.nan_detector import NanDetector
 from fairseq.optim import lr_scheduler
 from fairseq.utils import safe_hasattr
+from fairseq.modules import (
+    Fp32GroupNorm,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -399,6 +402,7 @@ class Trainer(object):
             self._gathered_optim_state = st
 
     def state_dict(self):
+        
         state_dict = {
             "args": None,  # legacy
             "cfg": (
@@ -447,11 +451,16 @@ class Trainer(object):
     def save_checkpoint(self, filename, extra_state):
         """Save all training state in a checkpoint file."""
         if self.should_save_checkpoint_on_current_rank:
+            # # TL
+            # for param in self.input_layer.parameters():
+            #     param.requires_grad = False
 
             logger.info(f"Saving checkpoint to {os.path.abspath(filename)}")
             # call state_dict on all ranks in case it needs internal communication
             state_dict = utils.move_to_cpu(self.state_dict())
             state_dict["extra_state"].update(extra_state)
+
+            # logger.info(state_dict['model']['feature_extractor.input_layer.0.weight'])
 
             checkpoint_utils.torch_persistent_save(
                 state_dict,
@@ -557,6 +566,7 @@ class Trainer(object):
                             reserve_head_index=reserve_head_index
                         )
                         layer.self_attn._set_skip_embed_dim_check()
+
                     logger.info(self.model)
                 # this is the code related to AdaPrune
                 # In short, it removes redundant units in feedforward layer in each transformer layer based on importance
@@ -581,10 +591,34 @@ class Trainer(object):
                         )
                         layer._prune_fc_layer(remove_index=remove_index)
                     logger.info(self.model)
-
+                logger.info('stepped')
                 self.model.load_state_dict(
                     state["model"], strict=True, model_cfg=self.cfg.model
                 )
+
+                # SANITY CHECKS FOR TRANSFER LEARNING
+                # logger.info("DEBUGGING TL")
+                # logger.info(self.model.feature_extractor)
+                # sd = self.model.state_dict()
+                # logger.info(sd['feature_extractor.input_layer.0.weight'])
+                # sd['feature_extractor.input_layer.0.weight'].zero_()
+                # logger.info(sd['feature_extractor.input_layer.0.weight'])
+                # logger.info(sd['feature_extractor.input_layer.0.weight'].shape)
+
+                # CHANGE/UNCOMMENt FOR TRANSFER LEARNING
+                self.model.feature_extractor.input_layer = torch.nn.Sequential(
+                    torch.nn.Conv1d(238, 512, 8, stride=5, bias=False),
+                    torch.nn.Dropout(p=0.0),
+                    Fp32GroupNorm(1, 512, affine=True),
+                    torch.nn.ELU(),
+                ).half().cuda()
+
+                # SANITY CHECKS FOR TRANSFER LEARNING
+                # logger.info(self.model.feature_extractor)
+
+                # sd = self.model.state_dict()
+                # logger.info(sd['feature_extractor.input_layer.0.weight'].shape)
+
                 # save memory for later steps
                 del state["model"]
                 if utils.has_parameters(self.get_criterion()):

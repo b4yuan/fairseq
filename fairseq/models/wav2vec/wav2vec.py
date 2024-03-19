@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 AGGREGATOR_CHOICES = ChoiceEnum(["cnn", "gru"])
 PROJECT_FEATURES_CHOICES = ChoiceEnum(["none", "same", "new"])
-ACTIVATION_CHOICES = ChoiceEnum(["relu", "gelu"])
+ACTIVATION_CHOICES = ChoiceEnum(["relu", "gelu", "lrelu", "elu"])
 VQ_TYPE_CHOICES = ChoiceEnum(["none", "gumbel", "kmeans"])
 
 
@@ -179,6 +179,10 @@ class Wav2VecModel(BaseFairseqModel):
             activation = nn.ReLU()
         elif cfg.activation == "gelu":
             activation = nn.GELU()
+        elif cfg.activation == 'lrelu':
+            activation = nn.LeakyReLU(negative_slope=0.1)
+        elif cfg.activation == 'elu':
+            activation = nn.ELU()
         else:
             raise Exception("unknown activation " + cfg.activation)
 
@@ -388,11 +392,22 @@ class ConvFeatureExtractionModel(nn.Module):
                 activation,
             )
 
-        in_d = 256 # match electrode channels
+        # For TL, this needs to be set to the electrodes of the 
+        # PREVIOUS patient
+        in_d = 238 # match electrode channels
+        self.input_layer = nn.ModuleList()
         self.conv_layers = nn.ModuleList()
+
+        tl_input_layer = True
         for dim, k, stride in conv_layers:
-            self.conv_layers.append(block(in_d, dim, k, stride))
-            in_d = dim
+            # TL
+            if tl_input_layer: 
+                self.input_layer = block(in_d, dim, k, stride)
+                in_d = dim
+                tl_input_layer = False
+            else:
+                self.conv_layers.append(block(in_d, dim, k, stride))
+                in_d = dim
 
         self.log_compression = log_compression
         self.skip_connections = skip_connections
@@ -401,6 +416,15 @@ class ConvFeatureExtractionModel(nn.Module):
     def forward(self, x):
         # BxT -> BxCxT
         # x = x.unsqueeze(1) 
+
+        # TL
+        residual = x
+        x = self.input_layer(x)
+        if self.skip_connections and x.size(1) == residual.size(1):
+                tsz = x.size(2)
+                r_tsz = residual.size(2)
+                residual = residual[..., :: r_tsz // tsz][..., :tsz]
+                x = (x + residual) * self.residual_scale
 
         for conv in self.conv_layers:
             residual = x

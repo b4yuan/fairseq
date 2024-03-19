@@ -13,6 +13,10 @@ import math
 import os
 import sys
 from typing import Any, Callable, Dict, List, Optional, Tuple
+# TL lib
+from fairseq.modules import (
+    Fp32GroupNorm,
+)
 
 # We need to setup root logger before importing any fairseq libraries.
 logging.basicConfig(
@@ -176,6 +180,8 @@ def main(cfg: FairseqConfig) -> None:
     max_epoch = cfg.optimization.max_epoch or math.inf
     lr = trainer.get_lr()
 
+    # all_valid_losses = []
+
     # TODO: a dry run on validation set to pin the memory
     valid_subsets = cfg.dataset.valid_subset.split(",")
     if not cfg.dataset.disable_validation:
@@ -203,6 +209,14 @@ def main(cfg: FairseqConfig) -> None:
 
         # train for one epoch
         valid_losses, should_stop = train(cfg, trainer, task, epoch_itr)
+
+        # valid_losses is a list with 1 element
+        # STOP if there's no improvement for 50 epochs --> this is the 'patience' config
+        # all_valid_losses.append(valid_losses[0])
+        # if len(all_valid_losses) > 0:
+        #     if min(all_valid_losses) < min(all_valid_losses[-50:]):
+        #         should_stop = True
+
         if should_stop:
             break
 
@@ -299,7 +313,7 @@ def train(
         tensorboard_logdir=(
             cfg.common.tensorboard_logdir
             if distributed_utils.is_master(cfg.distributed_training)
-            else None
+            else "/home/bayuan/Documents/fall23/ecog2vec/runs"
         ),
         default_log_format=("tqdm" if not cfg.common.no_progress_bar else "simple"),
         wandb_project=(
@@ -348,6 +362,12 @@ def train(
 
         if should_stop:
             break
+
+    # valid_losses_rounded = [round(loss, 3) for loss in valid_losses]
+    
+    # if (len(valid_losses_rounded) > 100) and (len(set(valid_losses_rounded[-100:]))) == 1:
+    #     should_stop = True
+    #     logger.info('Last 100 valid losses have not changed. Stopping early.')
 
     # log end-of-epoch stats
     logger.info("end of epoch {} (average epoch stats below)".format(epoch_itr.epoch))
@@ -497,7 +517,7 @@ def validate(
             tensorboard_logdir=(
                 cfg.common.tensorboard_logdir
                 if distributed_utils.is_master(cfg.distributed_training)
-                else None
+                else "/home/bayuan/Documents/fall23/ecog2vec/runs"
             ),
             default_log_format=("tqdm" if not cfg.common.no_progress_bar else "simple"),
             wandb_project=(

@@ -13,17 +13,18 @@ checkpoint:
 task:
   _name: audio_pretraining
   data: ???
-  max_sample_size: 250000
+  max_sample_size: 200000
   min_sample_size: 32000
   normalize: false
 
 dataset:
   num_workers: 6
-  max_tokens: 1400000
+  max_tokens: 200000
   skip_invalid_size_inputs_valid_test: true
+  batch_size: 10
 
 distributed_training:
-  distributed_world_size: 64
+  distributed_world_size: 1
   ddp_backend: legacy_ddp
 
 criterion:
@@ -55,3 +56,4 @@ model:
   dropout_features: 0.1
   feature_grad_mult: 0.1
   encoder_embed_dim: 768
+  # conv_feature_layers: "[(512, 8, 30)]"

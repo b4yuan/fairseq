@@ -102,7 +102,8 @@ class Wav2Vec2Config(FairseqDataclass):
         default=False, metadata={"help": "apply layernorm first in the transformer"}
     )
     conv_feature_layers: str = field(
-        default="[(512, 10, 5)] + [(512, 3, 2)] * 4 + [(512,2,2)] + [(512,2,2)]",
+        # default="[(512, 10, 5)] + [(512, 3, 2)] * 4 + [(512,2,2)] + [(512,2,2)]",
+        default="[(512, 8, 30)] + [(512, 3, 2)]",
         metadata={
             "help": "string describing convolutional feature extraction layers in form of a python list that contains "
             "[(dim, kernel_size, stride), ...]"
@@ -892,7 +893,7 @@ class ConvFeatureExtractionModel(nn.Module):
             else:
                 return nn.Sequential(make_conv(), nn.Dropout(p=dropout), nn.GELU())
 
-        in_d = 1
+        in_d = 238
         self.conv_layers = nn.ModuleList()
         for i, cl in enumerate(conv_layers):
             assert len(cl) == 3, "invalid conv definition: " + str(cl)
@@ -914,7 +915,7 @@ class ConvFeatureExtractionModel(nn.Module):
     def forward(self, x):
 
         # BxT -> BxCxT
-        x = x.unsqueeze(1)
+        # x = x.unsqueeze(1)
 
         for conv in self.conv_layers:
             x = conv(x)
