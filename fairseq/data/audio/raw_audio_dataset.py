@@ -135,7 +135,7 @@ class RawAudioDataset(FairseqDataset):
             
         # logger.info(target_size)
 
-        collated_sources = sources[0].new_zeros(len(sources), 256, target_size) # add the 256 arg for # of electrode channels
+        collated_sources = sources[0].new_zeros(len(sources), 232, target_size) # add the 256 arg for # of electrode channels
         # logger.info('Collated sources shape: ' + str(collated_sources.shape))
         padding_mask = (
             torch.BoolTensor(collated_sources.shape).fill_(False) if self.pad else None

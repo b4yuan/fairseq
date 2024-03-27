@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 AGGREGATOR_CHOICES = ChoiceEnum(["cnn", "gru"])
 PROJECT_FEATURES_CHOICES = ChoiceEnum(["none", "same", "new"])
-ACTIVATION_CHOICES = ChoiceEnum(["relu", "gelu"])
+ACTIVATION_CHOICES = ChoiceEnum(["relu", "gelu", "lrelu", "elu"])
 VQ_TYPE_CHOICES = ChoiceEnum(["none", "gumbel", "kmeans"])
 
 
@@ -179,6 +179,10 @@ class Wav2VecModel(BaseFairseqModel):
             activation = nn.ReLU()
         elif cfg.activation == "gelu":
             activation = nn.GELU()
+        elif cfg.activation == 'lrelu':
+            activation = nn.LeakyReLU(negative_slope=0.1)
+        elif cfg.activation == 'elu':
+            activation = nn.ELU()
         else:
             raise Exception("unknown activation " + cfg.activation)
 
@@ -388,7 +392,7 @@ class ConvFeatureExtractionModel(nn.Module):
                 activation,
             )
 
-        in_d = 256 # match electrode channels
+        in_d = 232 # match electrode channels
         self.conv_layers = nn.ModuleList()
         for dim, k, stride in conv_layers:
             self.conv_layers.append(block(in_d, dim, k, stride))
